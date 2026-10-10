@@ -80,10 +80,12 @@ Seed one document read by the agent with an **indirect prompt injection** instru
 ## Evidence
 
 The `evidence/` folder contains visual documentation of the project outcomes:
-- A screenshot showing the insecure agent successfully executing the unauthorized action and leaking secret data.
-- A screenshot showing the hardened agent successfully blocking the exact same indirect prompt injection attack.
-- A screenshot of the audit log displaying the timestamped blocked attempt.
-
+| File | What It Shows |
+|---|---|
+| `InsecureAgentEvidence 00.png` | Insecure agent leaking secret data |
+| `insecureAgentEvidence 01.png` | Additional insecure agent evidence |
+| `SecureAgentEvidence.png` | Hardened agent blocking the attack |
+| `auditLogevidence.png` | Timestamped audit log of blocked attempt |
 ## Findings Mapping
 
 | Risk | Reference |
