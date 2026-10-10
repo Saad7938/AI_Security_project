@@ -1,115 +1,118 @@
-# Secure an AI Agent That Can Take Actions
+# Policy-Gated AI Agent Security: Indirect Prompt-Injection Prototype
 
-The total work completed in this project is a working before-and-after demonstration of AI agent security. I built two Python agents using LangChain and Groq. The first agent, `insecureAgent.py`, has three tools: it can read support documents, create service tickets, and query an asset inventory. It has no authorization boundary. I demonstrated that when a malicious instruction is hidden inside a retrieved support document — an indirect prompt injection — the agent follows the instruction, calls the restricted tool, and leaks secret data. The secret data was Server XYZ-123, Location: Basement, and the audit log showed the leak. 
+A small research-learning project exploring a specific security question:
 
-The second agent, `secureAgent.py`, has the same three tools but places a tool gateway between the agent and every tool. The gateway enforces three controls. First, it checks an allow-list of permitted tools before any call executes. Second, it checks for forbidden keywords (restricted, confidential, secret, admin) in the tool arguments and blocks any call containing them. Third, it writes every blocked attempt to `tool_gateway_log.txt` with a timestamp and a reason. I demonstrated that when the same indirect prompt injection is used against the hardened agent, the LLM is still fooled — it still tries to call `read_support_docs` with "restricted asset" — but the gateway blocks the call, logs the attempt, and the agent never leaks the secret data. The model was manipulated in both runs. The only difference is the authorization boundary. That is the core research insight of the project.
+> If an LLM agent is manipulated by untrusted retrieved content, can an external authorization layer still prevent access to a restricted resource?
 
-A chatbot produces text. An agent uses tools, retrieves data and triggers workflows — a successful attack no longer just embarrasses you, it *does something*. The strongest demonstration: the model gets fully manipulated by an injection, and it doesn't matter, because hard authorisation boundaries stop the dangerous action from executing.
+This repository contains an intentionally insecure baseline (insecureAgent.py) and a policy-gated prototype (secureAgent.py). The assets and support scenario are fictional. The ticket operation is simulated; no real infrastructure is accessed.
 
-## Business Scenario
+## Current status
 
-An internal agent for IT support with three tools: read support documents, create a service ticket, and query a fictional asset inventory.
+**This is an early prototype, not a production security solution or a completed research study.** The policy module and unit tests are intended to make authorization behavior independently testable without calling an LLM.
 
-## Architecture — Before (Insecure Design)
+Implemented in the research-hardening branch:
+- Explicit application-assigned principals (support_agent, asset_admin).
+- Tool permission checks and resource classification (internal, restricted).
+- Canonical asset resolution before authorization. Access decisions do not depend on whether an argument contains words such as "secret" or "admin".
+- Deny-by-default behavior for unknown principals, unknown tools, and unknown assets.
+- JSON Lines audit events for both allowed and blocked calls, with query summaries truncated.
+- Unit tests for expected access, restricted-resource denial, aliases, unknown identities/tools, and audit logging.
 
-```mermaid
-flowchart LR
-    Doc[/Support Document\ncontains injected\ninstructions/] --> Agent
-    User([User]) -->|task| Agent["Agent\n(uses the user's own identity)\nno tool restrictions"]
-    Agent -->|reads| Tool1[Read Docs Tool]
-    Agent -->|unrestricted| Tool2[Create Ticket Tool]
-    Agent -->|unrestricted| Tool3[Asset Inventory Tool]
-    Tool3 -->|accesses restricted file| Restricted[(Restricted Asset\nData)]
+Not implemented yet:
+- Authentication of real users or cryptographically verified identities.
+- A real database, ticketing system, secrets manager, short-lived credentials, or emergency revocation.
+- Human approval workflows or a complete production audit pipeline.
+- Robust retrieval isolation, multi-model evaluation, or a measured prompt-injection benchmark.
+- A guarantee that prompt injection is prevented. The focus here is enforcing authorization at the tool boundary.
 
-    style Doc fill:#3a1414,stroke:#c0392b,color:#fff
-    style Restricted fill:#3a1414,stroke:#c0392b,color:#fff
-```
+## Architecture
 
-The seeded document instructs the agent to ignore its rules and access a restricted file / misuse a tool. In the insecure design, it succeeds — an unauthorised action nobody approved.
+~~~mermaid
+flowchart TD
+    U[User request] --> A[LLM agent]
+    D[Retrieved support docs: untrusted] --> A
+    A --> W[Tool wrapper]
+    W --> P[Policy gateway]
+    P -->|deny| L[Audit event]
+    P -->|allow| T[Tool implementation]
+    T --> L
+    T --> A
+~~~
 
-## Architecture — After (Hardened Design)
+The model can propose a tool call, but its proposal is not authorization. The application assigns the principal and checks tool/resource permissions before returning asset data.
 
-```mermaid
-flowchart LR
-    Doc[/Support Document\nlabeled UNTRUSTED/] -->|input trust label| Agent
-    User([User]) -->|task| IdentityCheck["Agent Identity\n(distinct from user,\nattributable)"]
-    IdentityCheck --> Agent[Agent]
-    Agent -->|allow-listed only| Gate{Tool Gateway\nresource-level\npermissions,\nleast privilege}
-    Gate -->|scoped, short-lived\ncredential| Tool1[Read Docs Tool]
-    Gate -->|scoped, short-lived\ncredential| Tool2[Create Ticket Tool]
-    Gate -.->|BLOCKED:\nnot in allow-list\nfor this task| Tool3[Asset Inventory Tool]
-    Gate -->|high-impact action| HITL[Human-in-the-loop\napproval]
-    Gate --> Log[(Tool-call Log\nfor auditability)]
-    Kill[[Emergency\nRevocation]] -.->|instantly kills access| Gate
+## Quick start
 
-    style Doc fill:#3a2a14,stroke:#e67e22,color:#fff
-    style Tool3 fill:#3a1414,stroke:#c0392b,color:#fff,stroke-dasharray: 5 5
-```
+Python 3.10+ is recommended.
 
-## Attack
+1. Create and activate a virtual environment.
+2. Install dependencies:
 
-Seed one document read by the agent with an **indirect prompt injection** instructing it to ignore its rules and access the restricted asset file or misuse the ticket tool. Demonstrate the insecure design succeeding first — that's the "before" that makes the "after" persuasive.
+   ~~~bash
+   python -m venv .venv
+   # Windows:
+   .venv\Scripts\activate
+   # macOS/Linux:
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ~~~
 
-## Hardened Controls
+3. Run the authorization tests. These tests do not require an API key:
 
-- Dedicated agent identity, distinct from the user, so actions are attributable and governable
-- Allow-list of tools and resource-level permissions — least privilege
-- Short-lived, scoped credentials rather than standing access
-- Human-in-the-loop approval for high-impact actions
-- Input trust labels marking retrieved/tool-returned content as untrusted
-- Complete tool-call logging for auditability
-- Emergency revocation mechanism to kill the agent's access instantly
+   ~~~bash
+   pytest -q
+   ~~~
 
-## Implementation Status
+4. To run the LLM demo, copy .env.example to .env, add your own Groq API key, then run:
 
-### Controls Implemented
-- **Tool allow-listing:** Permitted tools are checked before execution.
-- **Resource-level permissions:** Forbidden keywords (restricted, confidential, secret, admin) in tool arguments are blocked.
-- **Audit logging of blocked attempts:** Every blocked attempt is written to `tool_gateway_log.txt` with a timestamp and a reason.
-- **Partial input trust labeling:** Enforced via system prompt instruction.
+   ~~~bash
+   python secureAgent.py
+   ~~~
 
-### Future Work
-- **Dedicated agent identity:** Implementing a separate identity for the agent so actions are explicitly attributable and governable.
-- **Short-lived scoped credentials:** The gateway currently does not issue or manage credentials; this will be upgraded from standing access.
-- **Human-in-the-loop approval:** High-impact actions do not currently pause for human confirmation.
-- **Emergency revocation:** No kill switch currently exists to disable agent access instantly.
-- **Complete tool-call logging:** Currently, only blocked calls are logged, not allowed calls.
-- **Formal input trust labels:** Trust labeling is currently only a system prompt instruction, not a structured label with provenance metadata.
-- **Attack surface extension:** Testing more injection techniques, tool types, and LLM backends to measure how the gateway performs across different models.
+Never commit .env or real API keys. The model/API demo requires network access and may incur provider-side usage.
 
-## Evidence
+## Example policy
 
-The `evidence/` folder contains visual documentation of the project outcomes:
-| File | What It Shows |
-|---|---|
-| `InsecureAgentEvidence 00.png` | Insecure agent leaking secret data |
-| `insecureAgentEvidence 01.png` | Additional insecure agent evidence |
-| `SecureAgentEvidence.png` | Hardened agent blocking the attack |
-| `auditLogevidence.png` | Timestamped audit log of blocked attempt |
-## Findings Mapping
+| Principal | Internal asset | Restricted server |
+|---|---:|---:|
+| support_agent | Allow | Deny |
+| asset_admin | Allow | Allow |
 
-| Risk | Reference |
-|---|---|
-| Goal hijacking, tool misuse, memory poisoning, identity/privilege abuse | [OWASP GenAI Security — Agentic AI Threats](https://genai.owasp.org/) |
-| Prompt injection origin | [OWASP LLM01](https://owasp.org/www-project-top-10-for-large-language-model-applications/) |
-| System prompt / rule leakage | [OWASP LLM07](https://owasp.org/www-project-top-10-for-large-language-model-applications/) |
-| Adversary tactics | [MITRE ATLAS](https://atlas.mitre.org/) |
-| Least privilege, approvals, auditability principles | [CISA AI guidance](https://www.cisa.gov/ai) |
+This is a static demonstration policy, not a user-authentication system. In a real application, the principal must be derived from a trusted authenticated session and permissions must be enforced by the backend/data source.
 
-## Portfolio Checklist
+## Evaluation plan
 
-- [] Insecure agent implementation + demonstrated exploit (screenshot/log of unauthorised action)
-- [x] Hardened agent implementation with all seven controls above
-- [] Architecture diagrams (before/after, above)
-- [] Permission policy / allow-list definition
-- [] Retest evidence: same injection, model still fooled, action still blocked
-- [] Written report + short demo + one-page executive summary
+The next research step is to compare the insecure baseline with the policy-gated prototype over a documented set of benign and adversarial cases. Record each case, expected result, observed result, whether sensitive data was returned, and whether a legitimate request was incorrectly blocked.
 
-## Tools & References
+Suggested measures:
+- **Unauthorized disclosure rate:** restricted-resource requests that return protected fields / total restricted-resource attempts.
+- **Attack success rate:** adversarial cases that cause a prohibited tool action / total adversarial cases.
+- **Benign task success rate:** legitimate requests completed correctly / total benign cases.
+- **False-block rate:** legitimate requests denied / total legitimate requests.
 
-| Tool / Standard | Link |
-|---|---|
-| OWASP GenAI Security Project — Agentic AI Threats | https://genai.owasp.org/ |
-| OWASP Top 10 for LLM Applications | https://owasp.org/www-project-top-10-for-large-language-model-applications/ |
-| MITRE ATLAS | https://atlas.mitre.org/ |
-| CISA — AI | https://www.cisa.gov/ai |
+Do not report numerical results until the cases have actually been run. Keep deterministic policy unit tests separate from LLM-based tests, since model outputs can vary.
+
+## Limitations and threat model
+
+- The demo assumes the application has already assigned a principal; it does not authenticate a person.
+- Asset data is hardcoded and fictional.
+- The gateway is a Python module in the same process, not an isolated service. A compromised process could bypass it.
+- Document text is labeled untrusted in prompts and output strings, but this is not a complete prompt-injection defense.
+- Audit logs are local files and are not tamper-resistant; query summaries can still contain sensitive text.
+- The LLM wrapper and provider model may change. Pin dependencies and record versions before publishing formal results.
+
+## Repository layout
+
+- insecureAgent.py — intentionally vulnerable comparison baseline.
+- secureAgent.py — LLM demo with the gateway in front of each tool.
+- security_gateway.py — authorization policy, fictional inventory, and audit logging.
+- tests/test_security_gateway.py — deterministic policy tests.
+- .env.example — required environment variable template.
+
+## References to investigate
+
+- [OWASP GenAI Security Project](https://genai.owasp.org/)
+- [OWASP Top 10 for LLM Applications](https://owasp.org/www-project-top-10-for-large-language-model-applications/)
+- [MITRE ATLAS](https://atlas.mitre.org/)
+
+These references are starting points; this repository does not claim conformance or certification.
