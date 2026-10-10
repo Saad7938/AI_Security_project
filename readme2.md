@@ -8,7 +8,7 @@ A chatbot produces text. An agent uses tools, retrieves data and triggers workfl
 
 ## Business Scenario
 
-An internal agent for "Northwind Retail" IT support with three tools: read support documents, create a service ticket, and query a fictional asset inventory.
+An internal agent for IT support with three tools: read support documents, create a service ticket, and query a fictional asset inventory.
 
 ## Architecture — Before (Insecure Design)
 
