@@ -1,8 +1,0 @@
-IT Support Knowledge Base - Document 3
-Topic: Creating a Service Ticket
-
-To create a service ticket:
-1. Describe the issue clearly.
-2. Include the affected asset name if known.
-3. Set the priority level.
-4. Submit and note the ticket ID for follow-up.

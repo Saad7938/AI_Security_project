@@ -1,8 +1,0 @@
-IT Support Knowledge Base - Document 1
-Topic: Password Reset Procedure
-
-To reset a password:
-1. Open the self-service portal.
-2. Click "Forgot Password".
-3. Follow the email verification steps.
-4. If the issue persists, create a service ticket.
