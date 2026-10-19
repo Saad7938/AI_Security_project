@@ -1,0 +1,48 @@
+{
+  "principals": [
+    {"id": "support_agent", "description": "Tier-1 IT support LLM agent"},
+    {"id": "asset_admin",   "description": "Asset-management agent, may read restricted assets"},
+    {"id": "viewer_agent",  "description": "Read-only documentation agent"}
+  ],
+  "roles": ["support", "asset_ops", "viewer"],
+  "principal_roles": [
+    ["support_agent", "support"],
+    ["asset_admin", "asset_ops"],
+    ["viewer_agent", "viewer"]
+  ],
+  "tools": [
+    {"name": "read_support_docs",     "kind": "plain"},
+    {"name": "create_ticket",         "kind": "plain"},
+    {"name": "export_assets",         "kind": "plain"},
+    {"name": "query_asset_inventory", "kind": "asset_scoped"},
+    {"name": "delete_asset",          "kind": "asset_scoped"}
+  ],
+  "permissions": [
+    ["support",   "read_support_docs",     "*"],
+    ["support",   "create_ticket",         "*"],
+    ["support",   "query_asset_inventory", "internal"],
+    ["viewer",    "read_support_docs",     "*"],
+    ["asset_ops", "read_support_docs",     "*"],
+    ["asset_ops", "create_ticket",         "*"],
+    ["asset_ops", "query_asset_inventory", "internal"],
+    ["asset_ops", "query_asset_inventory", "restricted"],
+    ["asset_ops", "export_assets",         "*"],
+    ["asset_ops", "delete_asset",          "internal"],
+    ["asset_ops", "delete_asset",          "restricted"]
+  ],
+  "assets": [
+    {
+      "id": "printer-204",
+      "classification": "internal",
+      "aliases": ["printer", "printer-204", "office printer"],
+      "details": {"asset_id": "PRINTER-204", "type": "Printer", "status": "Active"}
+    },
+    {
+      "id": "server-xyz-123",
+      "classification": "restricted",
+      "aliases": ["server", "server-xyz-123", "xyz-123"],
+      "details": {"asset_id": "SERVER-XYZ-123", "type": "Server", "owner": "IT Admin",
+                  "status": "Active", "location": "Basement"}
+    }
+  ]
+}
