@@ -18,12 +18,11 @@ The example company, support documents, assets, users, and tickets are fictional
 - [How authorization works](#how-authorization-works)
 - [Repository structure](#repository-structure)
 - [Requirements and setup](#requirements-and-setup)
-- [Run the tests and deterministic benchmark](#run-the-tests-and-deterministic-benchmark)
 - [Run the interactive LLM demos](#run-the-interactive-llm-demos)
 - [Evaluation and current results](#evaluation-and-current-results)
-- [Run the optional live-model evaluation](#run-the-optional-live-model-evaluation)
 - [Threat model and limitations](#threat-model-and-limitations)
 - [Research extensions](#research-extensions)
+- [References for further study](#references-for-further-study)
 
 ## What the project does
 
@@ -199,7 +198,7 @@ sequenceDiagram
     DB-->>Policy: server-xyz-123 / restricted
     Policy-->>GW: Deny restricted resource
     GW->>Audit: Append block event and update violation counter
-    GW-->>Client: BLOCK; no asset details returned
+    GW-->>Client: BLOCK, no asset details returned
     Client-->>Agent: Blocked tool result
     Agent-->>User: Respond without restricted asset details
 ```
@@ -214,11 +213,11 @@ sequenceDiagram
     participant DB as SQLite Session Store
     Operator->>Script: Request token for support_agent
     Script->>Admin: POST /admin/token + X-Admin-Key
-    Admin->>Admin: Compare admin key; verify principal is enabled
+    Admin->>Admin: Compare admin key, verify principal is enabled
     Admin->>DB: Create session with unique jti
     Admin-->>Script: Signed short-lived JWT + jti
     Script-->>Operator: Print token
-    Note over Operator: Copy token to .env.agent; never copy gateway secrets there
+    Note over Operator: Copy token to .env.agent, never copy gateway secrets there
 ```
 
 ## Data-flow diagrams
@@ -245,7 +244,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     USER[User request] --> LLM[LLM agent]
-    LLM -->|Tool + query; no claimed identity accepted| CLIENT[Gateway client]
+    LLM -->|Tool + query, no claimed identity accepted| CLIENT[Gateway client]
     TOKEN[Short-lived signed token] --> CLIENT
     CLIENT -->|HTTP request + bearer token| API[Gateway API]
     API --> VERIFY[JWT, session and revocation checks]
